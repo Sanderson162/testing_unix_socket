@@ -8,7 +8,6 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <sys/time.h>
-#include <bits/types/sigevent_t.h>
 
 #define GAME_PATH "tpf_unix_sock.game"
 #define CHAT_PATH "tpf_unix_sock.chat"
@@ -26,11 +25,6 @@ typedef struct {
 
     client_sock_un * client_list[MAX_CLIENTS];
 } server_sock_un;
-
-
-typedef struct {
-
-} admin_server_info;
 
 typedef struct {
     int server_socket;
@@ -63,28 +57,26 @@ void read_server_message(int client_socket);
 
 int main(void){
 
-    ipc_socket_info ipcSocketInfo = {0};
-
     //server socket
-    ipcSocketInfo.server_socket = create_unix_stream_socket(SOCK_PATH);
+    int server_socket;
+    server_socket = create_unix_stream_socket(SOCK_PATH);
 
     // start client sockets; thread_listen_and_ping
     ipc_path_pair gameIpcPathPair = {SOCK_PATH, GAME_PATH};
     pthread_t game_thread_id;
     printf("Starting child thread\n");
     pthread_create(&game_thread_id, NULL, (void *(*)(void *)) thread_listen_and_ping, &gameIpcPathPair);
-    ipcSocketInfo.game_socket = accept_ipc_connection(ipcSocketInfo.server_socket);
+    int game_thread_socket;
+    game_thread_socket = accept_ipc_connection(server_socket);
 
     ipc_path_pair chatIpcPathPair = {SOCK_PATH, CHAT_PATH};
     pthread_t chat_thread_id;
     printf("Starting child thread\n");
     pthread_create(&chat_thread_id, NULL, (void *(*)(void *)) thread_listen_and_ping, &chatIpcPathPair);
-    ipcSocketInfo.chat_socket = accept_ipc_connection(ipcSocketInfo.server_socket);
+    int chat_thread_socket;
+    chat_thread_socket = accept_ipc_connection(server_socket);
 
 
-
-    struct sigevent sigTermCatch;
-    sigTermCatch.
     //pthread_join(thread_id, NULL);
 
 
@@ -101,75 +93,75 @@ int main(void){
     printf("beginning main loop\n");
     while (!exit_flag) {
 
-//        gettimeofday(&end_time,NULL);
+        gettimeofday(&end_time,NULL);
 
-//        long elapsed = ((end_time.tv_sec - start_time.tv_sec) * 1000000) + (end_time.tv_usec - start_time.tv_usec);
-//        printf("time elapsed after select returned %ld\n", elapsed);
-//        if (elapsed < timeout.tv_usec) {
-//            timeout.tv_usec -= elapsed;
-//        } else {
-//            timeout.tv_usec = 0;
-//        }
-//
-//        if (timeout.tv_usec == 0) {
-//            timeout.tv_usec = tick_rate.tv_usec;
-//            const char * message = "##### server to client";
-//            char * buffer = strdup(message);
-//            size_t buffer_size = strlen(buffer);
-//            send_data_to_client(ipcSocketInfo.game_socket,  buffer, buffer_size);
-//            send_data_to_client(ipcSocketInfo.chat_socket,  buffer, buffer_size);
-//            free(buffer);
-//        }
+        long elapsed = ((end_time.tv_sec - start_time.tv_sec) * 1000000) + (end_time.tv_usec - start_time.tv_usec);
+        printf("time elapsed after select returned %ld\n", elapsed);
+        if (elapsed < timeout.tv_usec) {
+            timeout.tv_usec -= elapsed;
+        } else {
+            timeout.tv_usec = 0;
+        }
+
+        if (timeout.tv_usec == 0) {
+            timeout.tv_usec = tick_rate.tv_usec;
+            const char * message = "##### server to client";
+            char * buffer = strdup(message);
+            size_t buffer_size = strlen(buffer);
+            send_data_to_client(game_thread_socket,  buffer, buffer_size);
+            send_data_to_client(chat_thread_socket,  buffer, buffer_size);
+            free(buffer);
+        }
 
 
         FD_ZERO(&fdSet);
         FD_SET(STDIN_FILENO, &fdSet);
-        FD_SET(ipcSocketInfo.server_socket, &fdSet);
-        FD_SET(ipcSocketInfo.game_socket, &fdSet);
-        FD_SET(ipcSocketInfo.chat_socket, &fdSet);
+        FD_SET(server_socket, &fdSet);
+        FD_SET(game_thread_socket, &fdSet);
+        FD_SET(chat_thread_socket, &fdSet);
 
-        int maxfd = ipcSocketInfo.server_socket;
+        int maxfd = server_socket;
 
-        if (ipcSocketInfo.game_socket > maxfd) {
-            maxfd = ipcSocketInfo.game_socket;
+        if (game_thread_socket > maxfd) {
+            maxfd = game_thread_socket;
         }
-        if (ipcSocketInfo.chat_socket > maxfd) {
-            maxfd = ipcSocketInfo.chat_socket;
+        if (chat_thread_socket > maxfd) {
+            maxfd = chat_thread_socket;
         }
 
 
         // the big select statement
         if(select(maxfd + 1, &fdSet, NULL, NULL, &timeout) > 0){
-//            gettimeofday(&start_time,NULL);
+            gettimeofday(&start_time,NULL);
             printf("timeout %ld %ld\n", timeout.tv_sec, timeout.tv_usec);
             if(FD_ISSET(STDIN_FILENO, &fdSet)) {
                 exit_flag = 1;
             }
 
             // check for connection on IPC
-            if (FD_ISSET(ipcSocketInfo.server_socket, &fdSet))
+            if (FD_ISSET(server_socket, &fdSet))
             {
                 // shouldn't be getting any new connections at this point.
                 printf("server socket set\n");
             }
-            if (FD_ISSET(ipcSocketInfo.game_socket, &fdSet))
+            if (FD_ISSET(game_thread_socket, &fdSet))
             {
-                read_packet_from_socket(ipcSocketInfo.game_socket);
+                read_packet_from_socket(game_thread_socket);
             }
-            if (FD_ISSET(ipcSocketInfo.chat_socket, &fdSet))
+            if (FD_ISSET(chat_thread_socket, &fdSet))
             {
-                read_packet_from_socket(ipcSocketInfo.chat_socket);
+                read_packet_from_socket(chat_thread_socket);
             }
 
         } else {
-//            gettimeofday(&start_time,NULL);
+            gettimeofday(&start_time,NULL);
             //printf("select timed out\n");
         }
     }
 
-    close(ipcSocketInfo.server_socket);
-    close(ipcSocketInfo.game_socket);
-    close(ipcSocketInfo.chat_socket);
+    close(server_socket);
+    close(game_thread_socket);
+    close(chat_thread_socket);
     return 0;
 }
 
@@ -324,22 +316,22 @@ void * thread_listen_and_ping(ipc_path_pair * ipcPathPair) {
 
     fd_set fdSet;
 
-//    //
-//    const struct timeval tick_rate = {0, 500000};
-//    struct timeval timeout = tick_rate;
+    //
+    const struct timeval tick_rate = {0, 500000};
+    struct timeval timeout = tick_rate;
 
     int exit_flag = 0;
 
     while (!exit_flag) {
 
-//        if (timeout.tv_usec == 0) {
-//            timeout.tv_usec = tick_rate.tv_usec;
-//            const char * message = "##### client to server";
-//            char * buffer = strdup(message);
-//            size_t buffer_size = strlen(buffer);
-//            send_data_to_server(client_socket, buffer, buffer_size);
-//            free(buffer);
-//        }
+        if (timeout.tv_usec == 0) {
+            timeout.tv_usec = tick_rate.tv_usec;
+            const char * message = "##### client to server";
+            char * buffer = strdup(message);
+            size_t buffer_size = strlen(buffer);
+            send_data_to_server(client_socket, buffer, buffer_size);
+            free(buffer);
+        }
 
 
         FD_ZERO(&fdSet);
@@ -350,7 +342,7 @@ void * thread_listen_and_ping(ipc_path_pair * ipcPathPair) {
 
 
         // the big select statement
-        if(select(maxfd + 1, &fdSet, NULL, NULL, NULL) > 0){
+        if(select(maxfd + 1, &fdSet, NULL, NULL, &timeout) > 0){
 
             if(FD_ISSET(STDIN_FILENO, &fdSet)) {
                 exit_flag = 1;
