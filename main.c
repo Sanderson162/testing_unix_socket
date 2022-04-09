@@ -84,7 +84,6 @@ int main(void){
 
 
     struct sigevent sigTermCatch;
-    sigTermCatch.
     //pthread_join(thread_id, NULL);
 
 
@@ -101,25 +100,25 @@ int main(void){
     printf("beginning main loop\n");
     while (!exit_flag) {
 
-//        gettimeofday(&end_time,NULL);
+        gettimeofday(&end_time,NULL);
 
-//        long elapsed = ((end_time.tv_sec - start_time.tv_sec) * 1000000) + (end_time.tv_usec - start_time.tv_usec);
-//        printf("time elapsed after select returned %ld\n", elapsed);
-//        if (elapsed < timeout.tv_usec) {
-//            timeout.tv_usec -= elapsed;
-//        } else {
-//            timeout.tv_usec = 0;
-//        }
-//
-//        if (timeout.tv_usec == 0) {
-//            timeout.tv_usec = tick_rate.tv_usec;
-//            const char * message = "##### server to client";
-//            char * buffer = strdup(message);
-//            size_t buffer_size = strlen(buffer);
-//            send_data_to_client(ipcSocketInfo.game_socket,  buffer, buffer_size);
-//            send_data_to_client(ipcSocketInfo.chat_socket,  buffer, buffer_size);
-//            free(buffer);
-//        }
+        long elapsed = ((end_time.tv_sec - start_time.tv_sec) * 1000000) + (end_time.tv_usec - start_time.tv_usec);
+        printf("time elapsed after select returned %ld\n", elapsed);
+        if (elapsed < timeout.tv_usec) {
+            timeout.tv_usec -= elapsed;
+        } else {
+            timeout.tv_usec = 0;
+        }
+
+        if (timeout.tv_usec == 0) {
+            timeout.tv_usec = tick_rate.tv_usec;
+            const char * message = "##### server to client";
+            char * buffer = strdup(message);
+            size_t buffer_size = strlen(buffer);
+            send_data_to_client(ipcSocketInfo.game_socket,  buffer, buffer_size);
+            send_data_to_client(ipcSocketInfo.chat_socket,  buffer, buffer_size);
+            free(buffer);
+        }
 
 
         FD_ZERO(&fdSet);
